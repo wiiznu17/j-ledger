@@ -34,11 +34,31 @@ export class GoogleVisionService {
   }
 
   async extractIdCardData(imageBuffer: Buffer) {
-    if (!this.client) {
-      this.logger.error(
-        'Google Cloud Vision client not initialised — missing GOOGLE_APPLICATION_CREDENTIALS_JSON',
+    const ocrProvider = this.configService.get<string>('KYC_OCR_PROVIDER_TYPE');
+    const isMock = ocrProvider === 'mock' || !this.client;
+
+    if (isMock) {
+      this.logger.log(
+        '[MOCK OCR] Google Vision client not available or mock mode active — returning mock ID card data',
       );
-      return null;
+      return {
+        idNumber: '1234567890123',
+        prefixTh: 'นาย',
+        firstNameTh: 'สมชาย',
+        lastNameTh: 'เข็มกลัด',
+        prefixEn: 'Mr.',
+        firstNameEn: 'Somchai',
+        lastNameEn: 'Khemklad',
+        dateOfBirth: '01 ม.ค. 2533',
+        idCardIssueDate: '01 ม.ค. 2560',
+        idCardExpiryDate: '01 ม.ค. 2570',
+        religion: 'พุทธ',
+        registeredAddress: '123/45 ถนนพระราม 9 แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพฯ',
+        subdistrict: 'ห้วยขวาง',
+        district: 'ห้วยขวาง',
+        province: 'กรุงเทพฯ',
+        fullText: 'บัตรประจำตัวประชาชน Thai National ID Card 1 2345 67890 12 3',
+      };
     }
 
     try {

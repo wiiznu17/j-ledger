@@ -10,6 +10,9 @@ import { Logger } from 'nestjs-pino';
 
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
+import express from 'express';
+import * as path from 'path';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { 
     rawBody: true,
@@ -20,6 +23,7 @@ async function bootstrap() {
   const expressApp = app.getHttpAdapter().getInstance();
   if (expressApp && typeof expressApp.set === 'function') {
     expressApp.set('trust proxy', 1);
+    expressApp.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
   }
 
 
