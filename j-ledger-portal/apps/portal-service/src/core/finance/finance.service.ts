@@ -2,7 +2,7 @@ import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { URLSearchParams } from 'url';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHmac } from 'crypto';
 import { TraceStorage } from '../common/trace-storage';
 
 interface CreateWalletRequest {
@@ -394,12 +394,19 @@ export class FinanceService {
 
       // Step 2: Simulate Payment Confirmation (Settlement)
       const webhookUrl = `${this.financeServiceUrl}/api/finance/webhooks`;
+      const amountStr = amount.toString();
+      const signature = this.generateWebhookSignature(
+        referenceId,
+        'SUCCESS',
+        amountStr,
+      );
       await this.httpService.axiosRef.post(
         webhookUrl,
         {
           reference_id: referenceId,
           status: 'SUCCESS',
-          signature: 'mock_signature_verified',
+          amount: amount,
+          signature,
         },
         { headers: this.getInternalHeaders() },
       );
@@ -414,6 +421,19 @@ export class FinanceService {
       this.logCompactError(`topUp (2-step) user=${userId}`, error);
       this.rethrowAsHttpException(error, 'Failed to process top up');
     }
+  }
+
+  private generateWebhookSignature(
+    referenceId: string,
+    status: string,
+    amount: string,
+  ): string {
+    const secret =
+      this.configService.get<string>('FINANCE_WEBHOOK_SECRET') ||
+      this.configService.get<string>('JLEDGER_INTERNAL_SECRET') ||
+      'finance_webhook_secret_key';
+    const data = `${referenceId}:${status}:${amount}`;
+    return createHmac('sha256', secret).update(data).digest('hex');
   }
 
   async createPaymentIntent(
@@ -447,15 +467,22 @@ export class FinanceService {
   async processPaymentWebhook(
     referenceId: string,
     status: 'SUCCESS' | 'FAILED',
+    amount: number = 0,
   ): Promise<any> {
     const url = `${this.financeServiceUrl}/api/finance/webhooks/payment`;
     try {
+      const signature = this.generateWebhookSignature(
+        referenceId,
+        status,
+        amount.toString(),
+      );
       const response = await this.httpService.axiosRef.post(
         url,
         {
           reference_id: referenceId,
           status,
-          signature: 'mock_signature_verified',
+          amount,
+          signature,
         },
         { headers: this.getInternalHeaders() },
       );

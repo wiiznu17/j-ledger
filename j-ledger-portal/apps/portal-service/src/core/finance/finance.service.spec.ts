@@ -194,7 +194,7 @@ describe('FinanceService', () => {
         'http://localhost:8081/api/finance/webhooks',
         expect.objectContaining({
           status: 'SUCCESS',
-          signature: 'mock_signature_verified',
+          signature: expect.any(String),
         }),
         expect.any(Object),
       );

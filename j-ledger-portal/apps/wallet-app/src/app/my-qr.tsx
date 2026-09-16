@@ -20,7 +20,7 @@ import { UserProfileService, UserProfile } from '@/lib/user-service';
 import { useScreenCaptureProtection } from '@/hooks/useScreenCaptureProtection';
 
 // Constants
-import { MOCK_USER } from '@/constants/mockData';
+const DEFAULT_AVATAR = require('../../assets/images/logo/logo.png');
 
 export default function MyQrScreen() {
   useScreenCaptureProtection();
@@ -104,21 +104,20 @@ export default function MyQrScreen() {
     if (digits.startsWith('0') && digits.length === 10) {
       return digits;
     }
-    // Fallback to mock if format is unexpected
-    return MOCK_USER.phone;
+    return phone;
   };
 
-  // Get phone number from real user profile or fallback to mock
+  // Get phone number from real user profile (no silent mock fallback)
   const phoneNumber = userProfile?.phoneNumber
     ? toLocalPhone(userProfile.phoneNumber)
-    : MOCK_USER.phone;
+    : '';
 
-  // Get user name from profile (English) or kycData (Thai) or fallback to mock
+  // Get user name from profile (English) or kycData (Thai) or fallback to email / account
   const userName = userProfile?.profile?.firstName
     ? `${userProfile.profile.firstName} ${userProfile.profile.lastName || ''}`.trim()
     : userProfile?.kycData?.firstNameTh
       ? `${userProfile.kycData.firstNameTh} ${userProfile.kycData.lastNameTh || ''}`.trim()
-      : MOCK_USER.name;
+      : userProfile?.email || 'My Wallet';
 
   // สร้างข้อมูลสำหรับ QR Code โดยแนบจำนวนเงินเข้าไปถ้ามีการระบุ
   const qrData = mode === 'PAY'
@@ -194,7 +193,7 @@ export default function MyQrScreen() {
             ref={qrCardRef}
             name={mode === 'PAY' ? 'PAYMENT CODE' : userName}
             phone={mode === 'PAY' ? 'SCAN TO DEBIT' : phoneNumber}
-            avatar={MOCK_USER.avatar}
+            avatar={DEFAULT_AVATAR}
             qrData={qrData}
             amount={mode === 'PAY' ? '' : amount}
           />

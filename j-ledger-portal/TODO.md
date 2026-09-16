@@ -45,8 +45,7 @@
 - [x] `apps/admin-web/src/lib/auth/csrf.ts:24` — แก้ destructuring bug เป็น `const [timestampStr, random, signature] = parts` และตรวจ HMAC signature อย่างถูกต้อง
 
 ### SEC-08: Webhook & Settlement Simulation ใช้ Hardcoded Signature ('mock_signature_verified') ⚠️ (ค้นพบเพิ่ม 2026-09-15)
-- [ ] `apps/portal-service/src/core/finance/finance.service.ts:401,457` — ส่ง payload ด้วย hardcoded `signature: 'mock_signature_verified'` ในการเรียก webhook จำลอง settlement ไปยัง finance-service → ใน production ใครก็ตามสามารถ bypass webhook verification หรือถ้าเปิดระบบ verify จริงการ settle ยอดเงิน 2-step จะล้มเหลวทันที
-  - **Fix**: คำนวณ HMAC-SHA256 signature จริงจาก request payload ด้วย secret key ระหว่าง service (`FINANCE_WEBHOOK_SECRET`)
+- [x] `apps/portal-service/src/core/finance/finance.service.ts:401,457` — คำนวณ HMAC-SHA256 signature จริงจาก request payload ด้วย secret key ระหว่าง service (`FINANCE_WEBHOOK_SECRET` / `JLEDGER_INTERNAL_SECRET`) แทน mock signature เรียบร้อย
 
 ---
 
@@ -108,7 +107,7 @@
 - [ ] `apps/portal-service/src/user/merchant/dto/apply-merchant.dto.ts:27` — `@IsOptional() // TODO: Make optional temporarily, should be required in production`
 
 ### CQ-08: Fraud Rule Engine มี Logic ไม่สมบูรณ์ (Stub / Bypassed Rules) ⚠️ (ค้นพบเพิ่ม 2026-09-15)
-- [ ] `apps/portal-service/src/modules/fraud/fraud.service.ts:88-100` — กฎ `FraudRuleType.VELOCITY` มีแค่ log debug ไม่ได้นับจำนวนธุรกรรมจริงใน sliding window และ `FraudRuleType.NEW_DEVICE` เป็น empty block (`break`) แล้วคืน `false` เสมอ → กฎตรวจจับธุรกรรมถี่ผิดปกติและตรวจจับอุปกรณ์ใหม่ใช้งานไม่ได้จริง
+- [x] `apps/portal-service/src/modules/fraud/fraud.service.ts` — เชื่อมต่อ Redis time-window counter สำหรับ Velocity check และเปรียบเทียบ deviceId กับฐานข้อมูล UserDevice เรียบร้อย
   - **Fix**: เชื่อมต่อกับ Redis / Database เพื่อทำ sliding window rate counter สำหรับ Velocity check และเปรียบเทียบ deviceId กับฐานข้อมูล `UserDevice`
 
 ### CQ-09: Admin Finance Sweep Stripe Balance ใช้ Mock Payout ID (ค้นพบเพิ่ม 2026-09-15)
@@ -116,15 +115,15 @@
   - **Fix**: เรียก Stripe API เพื่อสั่งจ่ายเงิน payout จริงไปยังบัญชีธนาคารของระบบก่อนนำ payout id มาบันทึกลงระบบ
 
 ### CQ-10: Local File S3 Service คืน Mock Buffer เมื่อไม่พบไฟล์ (ค้นพบเพิ่ม 2026-09-15)
-- [ ] `apps/portal-service/src/modules/kyc/services/s3.service.ts:104-106` — ในโหมด local disk ถ้าหาไฟล์ไม่พบ แทนที่จะ throw NotFoundException กลับคืน `Buffer.from('mock-file-content')` ทำให้ OCR/Face comparison ดำเนินการต่อด้วย buffer ปลอมแล้วประมวลผลผิดพลาด
+- [x] `apps/portal-service/src/modules/kyc/services/s3.service.ts` — throw `NotFoundException` แทนการคืน mock buffer เมื่อไม่พบไฟล์ เรียบร้อย
   - **Fix**: throw `NotFoundException(`File ${key} not found`)` เมื่อไม่พบไฟล์ในดิสก์
 
 ### CQ-11: Wallet App Scheduled Transfer Date Picker ใช้ Mock UI (+1 Day Button) (ค้นพบเพิ่ม 2026-09-15)
-- [ ] `apps/wallet-app/src/app/transfer/index.tsx:411` — หน้าโอนเงินตามกำหนดเวลา (Scheduled Transfer) ใช้ปุ่มกด mock `+1 Day` พร้อม comment `// In real app, open date picker. Here we just add 1 day as mock interaction` ทำให้ผู้ใช้งานไม่สามารถเลือกวันและเวลาที่ต้องการโอนจริงผ่านปฏิทินได้
+- [x] `apps/wallet-app/src/app/transfer/index.tsx` — ติดตั้งและเชื่อมต่อ `@react-native-community/datetimepicker` เพื่อเลือกวันโอนเงินตามกำหนดเวลาได้จริงทั้ง iOS/Android แทนปุ่ม mock `+1 Day` เรียบร้อย
   - **Fix**: เชื่อมต่อ DatePicker Component จริง (เช่น `@react-native-community/datetimepicker` หรือ Calendar Modal)
 
 ### CQ-12: Wallet App My QR Silent Fallback to Mock User (ค้นพบเพิ่ม 2026-09-15)
-- [ ] `apps/wallet-app/src/app/my-qr.tsx:107-116` — หากข้อมูล user profile หรือ walletId ยังโหลดไม่เสร็จหรือรูปแบบผิดปกติ หน้า My QR จะ fallback ไปใช้ข้อมูล `MOCK_USER` (Somchai Deeja, 0812345678) เงียบๆ ซึ่งอันตรายหากผู้ใช้เปิด QR เพื่อรับเงินจริง
+- [x] `apps/wallet-app/src/app/my-qr.tsx` — ลบ silent fallback ไปหา MOCK_USER โดยใช้ข้อมูลจริงจาก user profile / email / account และ default logo เรียบร้อย
   - **Fix**: แสดง Loading spinner หรือ error screen เมื่อไม่พบข้อมูลผู้ใช้ แทนการแสดง QR ของ Mock User
 
 ---

@@ -8,7 +8,9 @@ import {
   Platform,
   KeyboardAvoidingView,
   Alert,
+  Modal,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MotiView, AnimatePresence } from 'moti';
@@ -38,7 +40,17 @@ export default function TransferScreen() {
   const [isScheduled, setIsScheduled] = React.useState(false);
   const [scheduledFrequency, setFrequency] = React.useState('ONCE');
   const [scheduledDate, setScheduledDate] = React.useState(new Date(Date.now() + 86400000)); // Tomorrow
+  const [showDatePicker, setShowDatePicker] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (selectedDate) {
+      setScheduledDate(selectedDate);
+    }
+  };
   const [recipientNotFound, setRecipientNotFound] = React.useState(false);
   const [merchant, setMerchant] = React.useState<any>(null);
   const [isLoadingMerchant, setIsLoadingMerchant] = React.useState(false);
@@ -396,7 +408,11 @@ export default function TransferScreen() {
                   </View>
 
                   {/* Date Selection Display */}
-                  <View className="flex-row items-center gap-4 bg-gray-50 p-3 rounded-2xl">
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => setShowDatePicker(true)}
+                    className="flex-row items-center gap-4 bg-gray-50 p-3 rounded-2xl border border-gray-100"
+                  >
                     <View className="w-10 h-10 rounded-full bg-white items-center justify-center shadow-xs">
                       <CalendarClock size={18} color="#6366f1" />
                     </View>
@@ -406,18 +422,52 @@ export default function TransferScreen() {
                         {scheduledDate.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
                       </Text>
                     </View>
-                    <TouchableOpacity
-                      onPress={() => {
-                        // In real app, open date picker. Here we just add 1 day as mock interaction
-                        const next = new Date(scheduledDate);
-                        next.setDate(next.getDate() + 1);
-                        setScheduledDate(next);
-                      }}
-                      className="px-4 py-2 bg-white border border-gray-100 rounded-xl"
+                    <View className="px-3 py-1.5 bg-indigo-50 border border-indigo-100 rounded-xl">
+                      <Text className="text-[10px] font-black text-indigo-600">Change Date</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Native Date Picker for Android */}
+                  {Platform.OS === 'android' && showDatePicker && (
+                    <DateTimePicker
+                      value={scheduledDate}
+                      mode="date"
+                      display="default"
+                      minimumDate={new Date(Date.now() + 86400000)}
+                      onChange={onDateChange}
+                    />
+                  )}
+
+                  {/* Modal Date Picker for iOS */}
+                  {Platform.OS === 'ios' && (
+                    <Modal
+                      visible={showDatePicker}
+                      transparent
+                      animationType="fade"
+                      onRequestClose={() => setShowDatePicker(false)}
                     >
-                      <Text className="text-[10px] font-black text-indigo-500">+1 Day</Text>
-                    </TouchableOpacity>
-                  </View>
+                      <View className="flex-1 justify-end bg-black/40">
+                        <View className="bg-white rounded-t-3xl p-6 pb-10">
+                          <View className="flex-row justify-between items-center mb-4">
+                            <Text className="text-base font-bold text-gray-900">Select Transfer Date</Text>
+                            <TouchableOpacity
+                              onPress={() => setShowDatePicker(false)}
+                              className="px-4 py-2 bg-indigo-500 rounded-xl"
+                            >
+                              <Text className="text-xs font-bold text-white">Done</Text>
+                            </TouchableOpacity>
+                          </View>
+                          <DateTimePicker
+                            value={scheduledDate}
+                            mode="date"
+                            display="spinner"
+                            minimumDate={new Date(Date.now() + 86400000)}
+                            onChange={onDateChange}
+                          />
+                        </View>
+                      </View>
+                    </Modal>
+                  )}
                 </MotiView>
               )}
             </View>

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   S3Client,
   PutObjectCommand,
@@ -99,11 +99,11 @@ export class S3Service {
       try {
         const targetPath = path.join(this.uploadDir, key);
         return await fs.readFile(targetPath);
-      } catch (error) {
-        this.logger.warn(
-          `[LOCAL S3] File ${key} not found on local disk. Returning fallback mock buffer.`,
+      } catch (error: any) {
+        this.logger.error(
+          `[LOCAL S3] File ${key} not found on local disk: ${error.message}`,
         );
-        return Buffer.from('mock-file-content');
+        throw new NotFoundException(`File ${key} not found on local storage`);
       }
     }
 

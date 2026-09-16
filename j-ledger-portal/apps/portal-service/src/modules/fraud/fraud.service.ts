@@ -1,13 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import { FraudRule, FraudRuleType, FraudRuleAction } from '@prisma/client';
+import { FraudRule, FraudRuleType, FraudRuleAction, DeviceTrustLevel } from '@prisma/client';
 import { FraudRuleDto } from '@repo/dto';
+import Redis from 'ioredis';
+import { REDIS_CLIENT } from '../../core/common/constants';
 
 @Injectable()
 export class FraudService {
   private readonly logger = new Logger(FraudService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() @Inject(REDIS_CLIENT) private readonly redis?: Redis,
+  ) {}
 
   async findAll(): Promise<FraudRule[]> {
     return this.prisma.fraudRule.findMany({
@@ -56,6 +61,7 @@ export class FraudService {
     amount: number;
     type: string;
     metadata?: any;
+    deviceIdentifier?: string;
   }): Promise<{ action: FraudRuleAction; reason?: string } | null> {
     const activeRules = await this.prisma.fraudRule.findMany({
       where: { isActive: true },
@@ -86,17 +92,56 @@ export class FraudService {
         break;
 
       case FraudRuleType.VELOCITY:
-        // Example: Check number of transactions in the last X minutes
-        if (condition.windowMinutes && condition.maxCount) {
-          const startTime = new Date(Date.now() - condition.windowMinutes * 60 * 1000);
-          // Note: This logic would ideally query the Core Ledger or a local cache of recent txns
-          // For now, we mock a "triggered" if it's over a threshold (placeholder)
-          this.logger.debug(`Velocity check: user=${payload.userId} window=${condition.windowMinutes}m`);
+        // Check number of transactions in the last X minutes
+        if (condition.windowMinutes && condition.maxCount && payload.userId) {
+          const windowSeconds = Math.max(1, Number(condition.windowMinutes)) * 60;
+          const maxCount = Number(condition.maxCount);
+          if (this.redis) {
+            try {
+              const timeSlot = Math.floor(Date.now() / (windowSeconds * 1000));
+              const key = `fraud:velocity:${payload.userId}:${timeSlot}`;
+              const count = await this.redis.incr(key);
+              if (count === 1) {
+                await this.redis.expire(key, windowSeconds * 2);
+              }
+              if (count > maxCount) {
+                this.logger.warn(
+                  `Velocity check exceeded for user=${payload.userId}: count=${count} > max=${maxCount} in ${condition.windowMinutes}m`,
+                );
+                return true;
+              }
+            } catch (err: any) {
+              this.logger.warn(`Redis velocity check error: ${err.message}`);
+            }
+          }
         }
         break;
 
       case FraudRuleType.NEW_DEVICE:
-        // Logic to check if device is trusted/known
+        // Check if device is trusted/known
+        if (payload.userId) {
+          const deviceId =
+            payload.metadata?.deviceId ||
+            payload.metadata?.deviceIdentifier ||
+            payload.deviceIdentifier;
+          if (deviceId) {
+            const device = await this.prisma.userDevice.findUnique({
+              where: {
+                userId_deviceIdentifier: {
+                  userId: payload.userId,
+                  deviceIdentifier: deviceId,
+                },
+              },
+            });
+            // Trigger rule if device is completely unknown or untrusted
+            if (!device || device.trustLevel === DeviceTrustLevel.UNKNOWN) {
+              this.logger.warn(
+                `New or untrusted device detected for user=${payload.userId}: deviceId=${deviceId}`,
+              );
+              return true;
+            }
+          }
+        }
         break;
 
       default:
