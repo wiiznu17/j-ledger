@@ -17,10 +17,11 @@ export class ReportingService {
       'FINANCE_SERVICE_URL',
       'http://localhost:8081',
     );
-    this.internalSecret = this.configService.get<string>(
-      'JLEDGER_INTERNAL_SECRET',
-      'default_internal_secret',
-    );
+    const secret = this.configService.get<string>('JLEDGER_INTERNAL_SECRET');
+    if (!secret) {
+      throw new Error('JLEDGER_INTERNAL_SECRET is required in environment');
+    }
+    this.internalSecret = secret;
   }
 
   private async forwardToGateway<T = any>(

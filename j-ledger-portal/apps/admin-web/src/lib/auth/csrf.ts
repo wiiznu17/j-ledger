@@ -1,39 +1,53 @@
 import { cookies } from 'next/headers';
+import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 
-const CSRF_SECRET = process.env.CSRF_SECRET;
-if (!CSRF_SECRET) {
-  throw new Error('CSRF_SECRET is required');
+function getCsrfSecret(): string {
+  const secret = process.env.CSRF_SECRET;
+  if (!secret) {
+    throw new Error('CSRF_SECRET is required');
+  }
+  return secret;
 }
 
 export async function generateCSRFToken(): Promise<string> {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2);
-  const token = Buffer.from(`${timestamp}.${random}.${CSRF_SECRET}`).toString(
-    'base64',
-  );
-  return token;
+  const secret = getCsrfSecret();
+  const timestamp = Date.now().toString();
+  const random = randomBytes(16).toString('hex');
+  const message = `${timestamp}.${random}`;
+  const signature = createHmac('sha256', secret).update(message).digest('hex');
+  return Buffer.from(`${message}.${signature}`).toString('base64');
 }
 
 export async function validateCSRFToken(token: string): Promise<boolean> {
   try {
+    const secret = getCsrfSecret();
     const decoded = Buffer.from(token, 'base64').toString('utf-8');
     const parts = decoded.split('.');
 
     if (parts.length !== 3) return false;
 
-    const [timestampStr, secret] = parts;
-    const timestamp = parseInt(timestampStr!, 10);
+    const [timestampStr, random, signature] = parts;
+    if (!timestampStr || !random || !signature) return false;
 
+    const timestamp = parseInt(timestampStr, 10);
     if (isNaN(timestamp)) return false;
 
     // Check if token is expired (1 hour)
     const tokenAge = Date.now() - timestamp;
-    if (tokenAge > 60 * 60 * 1000) return false;
+    if (tokenAge < 0 || tokenAge > 60 * 60 * 1000) return false;
 
-    // Check secret
-    if (secret !== CSRF_SECRET) return false;
+    // Verify HMAC signature using timingSafeEqual
+    const message = `${timestampStr}.${random}`;
+    const expectedSignature = createHmac('sha256', secret).update(message).digest('hex');
 
-    return true;
+    const sigBuffer = Buffer.from(signature, 'hex');
+    const expectedSigBuffer = Buffer.from(expectedSignature, 'hex');
+
+    if (sigBuffer.length !== expectedSigBuffer.length) {
+      return false;
+    }
+
+    return timingSafeEqual(sigBuffer, expectedSigBuffer);
   } catch (error) {
     console.error('CSRF validation failed:', error);
     return false;
@@ -53,9 +67,11 @@ export async function getCSRFToken(): Promise<string> {
   cookieStore.set('csrf_token', newToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
     maxAge: 60 * 60, // 1 hour
     path: '/',
   });
 
   return newToken;
 }
+

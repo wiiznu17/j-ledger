@@ -81,6 +81,11 @@ export default function ReviewTransferScreen() {
   // Error handling
   const [error, setError] = useState<TransferError | null>(null);
 
+  // Generate idempotency key once per screen session (prevents double charging on retry)
+  const [idempotencyKey] = useState(
+    () => `p2p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+  );
+
   // Authentication states
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showBiometric, setShowBiometric] = useState(false);
@@ -214,7 +219,6 @@ export default function ReviewTransferScreen() {
         });
       } else {
         // P2P Transfer Flow
-        const idempotencyKey = `p2p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const transferRes = await api.post('/integration/p2p/transfer', {
           recipientPhone: recipient,
           amount: transferAmount,

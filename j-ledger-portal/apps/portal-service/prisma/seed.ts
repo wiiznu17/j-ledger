@@ -558,8 +558,12 @@ async function main() {
   });
 
   const financeUrl = process.env.FINANCE_SERVICE_URL || 'http://localhost:8081';
-  const internalSecret =
-    process.env.JLEDGER_INTERNAL_SECRET || 'default_internal_secret';
+  const internalSecret = process.env.JLEDGER_INTERNAL_SECRET;
+  if (!internalSecret) {
+    throw new Error(
+      'JLEDGER_INTERNAL_SECRET environment variable is required to run database seed',
+    );
+  }
   const headers = { 'X-Internal-Secret': internalSecret };
 
   // --- CORE SYSTEM SEEDING (Runs in ALL environments) ---

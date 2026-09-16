@@ -1,6 +1,6 @@
 # J-Ledger Portal – TODO / Code Health Checklist
 
-> สแกนเมื่อ: 2026-06-03 (อัปเดตล่าสุด: 2026-06-24)
+> สแกนเมื่อ: 2026-06-03 (อัปเดตล่าสุด: 2026-09-15)
 > สแกนโดย: Antigravity AI Pair Programmer
 
 ---
@@ -8,13 +8,13 @@
 ## 🔴 Critical — Security Issues (ต้องแก้ก่อน Production)
 
 ### SEC-01: Hardcoded Fallback Secrets
-- [ ] `apps/admin-web/src/lib/auth/jwt.ts:16` — JWT secret fallback `'jledger-admin-super-secret-2024-dev-key-32chars'` อยู่ใน source code ถ้าลืมตั้ง env variable ก็จะใช้ key นี้ใน production ได้
+- [x] `apps/admin-web/src/lib/auth/jwt.ts:16` — JWT secret fallback `'jledger-admin-super-secret-2024-dev-key-32chars'` อยู่ใน source code ถ้าลืมตั้ง env variable ก็จะใช้ key นี้ใน production ได้
   - **Fix**: ให้ throw error ถ้า `ADMIN_JWT_SECRET` ไม่มี (เหมือนที่ proxy.ts ทำแล้ว)
-- [ ] `apps/portal-service/src/core/common/guards/internal-auth.guard.ts:15` — fallback secret `'jledger_ecosystem_secret_2024'` hardcoded ถ้าไม่ตั้ง env จะใช้ค่านี้
+- [x] `apps/portal-service/src/core/common/guards/internal-auth.guard.ts:15` — fallback secret `'jledger_ecosystem_secret_2024'` hardcoded ถ้าไม่ตั้ง env จะใช้ค่านี้
   - **Fix**: throw error เมื่อ `JLEDGER_INTERNAL_SECRET` ไม่มี
-- [ ] `apps/portal-service/src/modules/reporting/reporting.service.ts:22` — fallback `'default_internal_secret'` hardcoded
+- [x] `apps/portal-service/src/modules/reporting/reporting.service.ts:22` — fallback `'default_internal_secret'` hardcoded
   - **Fix**: ให้ ConfigService throw error เมื่อไม่มีค่า
-- [ ] `apps/portal-service/prisma/seed.ts:562` — fallback `'default_internal_secret'` hardcoded ใน seed script → หาก seed ถูกรันใน production โดยไม่ตั้ง env จะใช้ค่านี้
+- [x] `apps/portal-service/prisma/seed.ts:562` — fallback `'default_internal_secret'` hardcoded ใน seed script → หาก seed ถูกรันใน production โดยไม่ตั้ง env จะใช้ค่านี้
   - **Fix**: throw error เมื่อ `JLEDGER_INTERNAL_SECRET` ไม่มี
 
 ### SEC-02: OTP/Token ถูก Log ใน Production
@@ -24,35 +24,36 @@
 - [x] `apps/portal-service/src/modules/kyc/services/kyc-process.service.ts:192` — ลบ console.log ข้อมูล KYC และเปลี่ยนเป็น debug log ข้อความระบุสิทธิ์โดยไม่มี PII
 
 ### SEC-03: Insecure Random สำหรับ Security-Critical Operations
-- [ ] `apps/portal-service/src/modules/identity/services/user-security.service.ts:281` — ใช้ `Math.random()` สร้าง OTP → ต้องเปลี่ยนเป็น `crypto.randomInt()`
-- [ ] `apps/portal-service/src/modules/identity/services/user-profile.service.ts:191` — ใช้ `Math.random()` สร้าง OTP → ต้องเปลี่ยนเป็น `crypto.randomInt()`
-- [ ] `apps/portal-service/src/modules/identity/services/user-registration.service.ts:698` — ใช้ `Math.random()` สร้าง OTP → ต้องเปลี่ยนเป็น `crypto.randomInt()`
-- [ ] `apps/admin-web/src/lib/auth/csrf.ts:10` — ใช้ `Math.random()` สร้าง CSRF token → ไม่ปลอดภัยเพียงพอ
-- [ ] `apps/portal-service/src/modules/billing/billing.service.ts:54` — ใช้ `Math.random()` สร้าง Invoice number random part → อาจ collide ควรใช้ `crypto.randomBytes()`
-- [ ] `apps/portal-service/src/core/finance/finance.service.ts:379` — ใช้ `Math.random()` สร้าง Top-up reference ID → financial reference ควรใช้ `crypto.randomUUID()`
-- [ ] `apps/portal-service/src/app.module.ts:44` — fallback Trace ID ใช้ `Math.random().toString(36).slice(2, 9)` แค่ 7 ตัวอักษร → อาจ collide ควรใช้ `crypto.randomUUID()`
+- [x] `apps/portal-service/src/modules/identity/services/user-security.service.ts:281` — ใช้ `Math.random()` สร้าง OTP → เปลี่ยนเป็น `crypto.randomInt()` เรียบร้อย
+- [x] `apps/portal-service/src/modules/identity/services/user-profile.service.ts:191` — ใช้ `Math.random()` สร้าง OTP → เปลี่ยนเป็น `crypto.randomInt()` เรียบร้อย
+- [x] `apps/portal-service/src/modules/identity/services/user-registration.service.ts:698` — ใช้ `Math.random()` สร้าง OTP → เปลี่ยนเป็น `crypto.randomInt()` เรียบร้อย
+- [x] `apps/admin-web/src/lib/auth/csrf.ts:10` — ใช้ `Math.random()` สร้าง CSRF token → เปลี่ยนเป็น `crypto.randomBytes(16)` พร้อม HMAC-SHA256 เรียบร้อย
+- [x] `apps/portal-service/src/modules/billing/billing.service.ts:54` — ใช้ `Math.random()` สร้าง Invoice number random part → เปลี่ยนเป็น `crypto.randomBytes(2).toString('hex').toUpperCase()` เรียบร้อย
+- [x] `apps/portal-service/src/core/finance/finance.service.ts:379` — ใช้ `Math.random()` สร้าง Top-up reference ID → เปลี่ยนเป็น `crypto.randomUUID()` เรียบร้อย
+- [x] `apps/portal-service/src/app.module.ts:44` — fallback Trace ID ใช้ `Math.random().toString(36).slice(2, 9)` → เปลี่ยนเป็น `crypto.randomUUID()` เรียบร้อย
 
 ### SEC-04: Cookie sameSite ไม่ได้ตั้งทั้งระบบ
-- [ ] `apps/admin-web/src/app/actions/auth.ts` — cookies ทั้งหมด (admin_session, refresh_token, user_id, user_role, user_permissions) ไม่ได้ตั้ง `sameSite` → ต้องเพิ่ม `sameSite: 'lax'` หรือ `'strict'`
-  - proxy.ts ตั้ง sameSite แล้วแต่ auth actions ไม่ได้ตั้ง → inconsistent
+- [x] `apps/admin-web/src/app/actions/auth.ts` — cookies ทั้งหมด (admin_session, refresh_token, user_id, user_role, user_permissions) และ `csrf.ts` (csrf_token) ตั้ง `sameSite: 'lax'` เรียบร้อยสอดคล้องกับ proxy.ts
 
 ### SEC-05: CSRF Token ไม่ปลอดภัย
-- [ ] `apps/admin-web/src/lib/auth/csrf.ts` — CSRF token เป็นแค่ base64 ของ timestamp + random + secret → ใครที่รู้ secret สามารถ forge ได้ ต้องใช้ HMAC signing
+- [x] `apps/admin-web/src/lib/auth/csrf.ts` — ปรับปรุงเป็น HMAC-SHA256 signing พร้อม `crypto.timingSafeEqual()` และ secure random bytes เรียบร้อย
 
 ### SEC-06: KYC ID Card Deduplication Bypass
-- [ ] `apps/portal-service/src/modules/kyc/services/kyc-process.service.ts:195,316-317` — TODO comment อยู่: mock mode append userId ลง idCardToken → production ต้อง hash เฉพาะ idCardNumber เพื่อป้องกัน 1 คนใช้บัตรหลายบัญชี
+- [x] `apps/portal-service/src/modules/kyc/services/kyc-process.service.ts:195,316-317` — ปรับให้ hash เฉพาะ clean idCardNumber ใน production เพื่อบังคับใช้ global deduplication และตรวจสอบความซ้ำซ้อนใน updateIdCardData
 
 ### SEC-07: CSRF Validation มี Destructuring Bug ⚠️ (ค้นพบเพิ่ม 2026-06-24)
-- [ ] `apps/admin-web/src/lib/auth/csrf.ts:24` — Token format = `timestamp.random.CSRF_SECRET` แต่ validation destructure เป็น `const [timestampStr, secret] = parts` ซึ่ง `secret` ได้ค่าเป็น `parts[1]` (random string) ไม่ใช่ `parts[2]` (CSRF_SECRET จริง) → **CSRF validation จะ reject ทุก valid token เสมอ**
-  - **Fix**: เปลี่ยนเป็น `const [timestampStr, , secret] = parts` หรือ refactor ทั้ง function ให้ใช้ HMAC signing แทน (รวมกับ SEC-05)
+- [x] `apps/admin-web/src/lib/auth/csrf.ts:24` — แก้ destructuring bug เป็น `const [timestampStr, random, signature] = parts` และตรวจ HMAC signature อย่างถูกต้อง
+
+### SEC-08: Webhook & Settlement Simulation ใช้ Hardcoded Signature ('mock_signature_verified') ⚠️ (ค้นพบเพิ่ม 2026-09-15)
+- [ ] `apps/portal-service/src/core/finance/finance.service.ts:401,457` — ส่ง payload ด้วย hardcoded `signature: 'mock_signature_verified'` ในการเรียก webhook จำลอง settlement ไปยัง finance-service → ใน production ใครก็ตามสามารถ bypass webhook verification หรือถ้าเปิดระบบ verify จริงการ settle ยอดเงิน 2-step จะล้มเหลวทันที
+  - **Fix**: คำนวณ HMAC-SHA256 signature จริงจาก request payload ด้วย secret key ระหว่าง service (`FINANCE_WEBHOOK_SECRET`)
 
 ---
 
 ## 🟠 High — Code Quality & Correctness
 
 ### CQ-00: Idempotency Key ใน Mobile App ถูกสุ่มใหม่ทุกครั้งที่กดปุ่ม
-- [ ] `apps/wallet-app/src/app/transfer/review.tsx:217` — ตัวแปร `idempotencyKey` ถูกสร้างแบบ random ภายในฟังก์ชัน `performTransfer` ซึ่งจะถูกเรียกใหม่ทุกครั้งที่กดปุ่มยืนยัน หรือกดปุ่ม Retry ตอนที่ Network Timeout ทำให้ Backend มองว่าเป็น Transaction ใหม่และอาจหักเงินซ้ำได้ 
-  - **Fix**: ควรย้ายการสร้าง `idempotencyKey` ไปไว้ที่ `useState` หรือ `useMemo` เพื่อให้ Key ถูกสุ่มแค่ครั้งเดียวตอนเปิดหน้าจอนี้ขึ้นมา
+- [x] `apps/wallet-app/src/app/transfer/review.tsx:217` — ย้ายการสร้าง `idempotencyKey` ไปไว้ที่ `useState` เพื่อให้ Key ถูกสุ่มแค่ครั้งเดียวตอนเปิดหน้าจอ ป้องกันการหักเงินซ้ำเมื่อกด retry หรือเน็ตหลุดเรียบร้อย
 
 
 ### CQ-01: proxy.ts ตรวจ JWT ซ้ำซ้อน
@@ -106,6 +107,26 @@
 ### CQ-07: DTO ที่ยัง TODO อยู่
 - [ ] `apps/portal-service/src/user/merchant/dto/apply-merchant.dto.ts:27` — `@IsOptional() // TODO: Make optional temporarily, should be required in production`
 
+### CQ-08: Fraud Rule Engine มี Logic ไม่สมบูรณ์ (Stub / Bypassed Rules) ⚠️ (ค้นพบเพิ่ม 2026-09-15)
+- [ ] `apps/portal-service/src/modules/fraud/fraud.service.ts:88-100` — กฎ `FraudRuleType.VELOCITY` มีแค่ log debug ไม่ได้นับจำนวนธุรกรรมจริงใน sliding window และ `FraudRuleType.NEW_DEVICE` เป็น empty block (`break`) แล้วคืน `false` เสมอ → กฎตรวจจับธุรกรรมถี่ผิดปกติและตรวจจับอุปกรณ์ใหม่ใช้งานไม่ได้จริง
+  - **Fix**: เชื่อมต่อกับ Redis / Database เพื่อทำ sliding window rate counter สำหรับ Velocity check และเปรียบเทียบ deviceId กับฐานข้อมูล `UserDevice`
+
+### CQ-09: Admin Finance Sweep Stripe Balance ใช้ Mock Payout ID (ค้นพบเพิ่ม 2026-09-15)
+- [ ] `apps/portal-service/src/admin/finance/admin-finance.controller.ts:434` — endpoint `POST /admin/finance/treasury/sweep-stripe` สร้าง `stripePayoutId = po_mock_${...}` สุ่มขึ้นมาเอง แล้วส่งยืนยันไปที่ finance gateway โดยไม่ได้เรียก `stripe.payouts.create()` จริงกับ Stripe API
+  - **Fix**: เรียก Stripe API เพื่อสั่งจ่ายเงิน payout จริงไปยังบัญชีธนาคารของระบบก่อนนำ payout id มาบันทึกลงระบบ
+
+### CQ-10: Local File S3 Service คืน Mock Buffer เมื่อไม่พบไฟล์ (ค้นพบเพิ่ม 2026-09-15)
+- [ ] `apps/portal-service/src/modules/kyc/services/s3.service.ts:104-106` — ในโหมด local disk ถ้าหาไฟล์ไม่พบ แทนที่จะ throw NotFoundException กลับคืน `Buffer.from('mock-file-content')` ทำให้ OCR/Face comparison ดำเนินการต่อด้วย buffer ปลอมแล้วประมวลผลผิดพลาด
+  - **Fix**: throw `NotFoundException(`File ${key} not found`)` เมื่อไม่พบไฟล์ในดิสก์
+
+### CQ-11: Wallet App Scheduled Transfer Date Picker ใช้ Mock UI (+1 Day Button) (ค้นพบเพิ่ม 2026-09-15)
+- [ ] `apps/wallet-app/src/app/transfer/index.tsx:411` — หน้าโอนเงินตามกำหนดเวลา (Scheduled Transfer) ใช้ปุ่มกด mock `+1 Day` พร้อม comment `// In real app, open date picker. Here we just add 1 day as mock interaction` ทำให้ผู้ใช้งานไม่สามารถเลือกวันและเวลาที่ต้องการโอนจริงผ่านปฏิทินได้
+  - **Fix**: เชื่อมต่อ DatePicker Component จริง (เช่น `@react-native-community/datetimepicker` หรือ Calendar Modal)
+
+### CQ-12: Wallet App My QR Silent Fallback to Mock User (ค้นพบเพิ่ม 2026-09-15)
+- [ ] `apps/wallet-app/src/app/my-qr.tsx:107-116` — หากข้อมูล user profile หรือ walletId ยังโหลดไม่เสร็จหรือรูปแบบผิดปกติ หน้า My QR จะ fallback ไปใช้ข้อมูล `MOCK_USER` (Somchai Deeja, 0812345678) เงียบๆ ซึ่งอันตรายหากผู้ใช้เปิด QR เพื่อรับเงินจริง
+  - **Fix**: แสดง Loading spinner หรือ error screen เมื่อไม่พบข้อมูลผู้ใช้ แทนการแสดง QR ของ Mock User
+
 ---
 
 ## 🟡 Medium — Architecture & Readability
@@ -138,6 +159,14 @@
 - [ ] `apps/portal-service/src/modules/identity/identity.service.ts:386,409` — ใช้ `throw new Error(...)` 2 จุด (ค้นพบเพิ่ม 2026-06-24)
   - **Fix**: เปลี่ยนทั้งหมดเป็น `throw new BadRequestException(...)`, `ConflictException`, `NotFoundException` ตามบริบท
   - **Scope**: ~27 จุดทั่วทั้ง modules → ค่อยๆ fix เป็น sprint
+
+### ARCH-07: Statement Export ส่งเป็น Plain Text ใน Kafka Event แทนไฟล์ PDF จริง (ค้นพบเพิ่ม 2026-09-15)
+- [ ] `apps/portal-service/src/modules/admin/admin-approval.service.ts:166-178` — คอมเมนต์ระบุ `// Generate mock PDF attachment` แต่แท้จริงแล้วแปลงธุรกรรมเป็น string `txText` แล้วส่งลง `metadata.statementText` ผ่าน Kafka ไปยัง notification-worker โดยยังไม่มี PDF generation library (เช่น PDFKit / Puppeteer) และไม่ได้บันทึกไฟล์ขึ้น S3 เพื่อส่ง attachment จริง
+  - **Fix**: สร้าง PDF generator service เพื่อสร้างไฟล์ PDF บัญชีรายการจริง อัปโหลดเข้า S3/Storage และส่งอีเมลพร้อม attachment หรือ pre-signed download URL
+
+### ARCH-08: Notification Worker Email Service ขาด Retry & Error Tracking (ค้นพบเพิ่ม 2026-09-15)
+- [ ] `apps/notification-worker/src/email/email.service.ts:35` — เมื่อ `nodemailer.sendMail()` ล้มเหลว มีเพียง `console.error` แล้ว throw ออกไปตรงๆ ขาดระบบ Dead Letter Queue (DLQ), exponential backoff retry และ structured error logging
+  - **Fix**: ย้ายไปใช้ NestJS `Logger`, จัดการ retry หรือส่งเข้า Dead Letter Queue (Kafka) เพื่อป้องกันข้อความแจ้งเตือนสำคัญของลูกค้าสูญหาย
 
 ---
 

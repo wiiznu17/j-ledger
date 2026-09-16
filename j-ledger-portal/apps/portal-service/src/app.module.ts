@@ -27,6 +27,7 @@ import { ThrottlerStorageRedisService } from './core/redis/throttler-storage-red
 import { LoggerModule } from 'nestjs-pino';
 import { TraceMiddleware } from './core/common/middleware/trace.middleware';
 import { FinanceModule } from './core/finance/finance.module';
+import { randomUUID } from 'crypto';
 
 @Module({
   imports: [
@@ -41,7 +42,7 @@ import { FinanceModule } from './core/finance/finance.module';
             : undefined,
         autoLogging: true,
         genReqId: (req: any) =>
-          req.headers['x-trace-id'] || req.id || Math.random().toString(36).slice(2, 9),
+          req.headers['x-trace-id'] || req.id || randomUUID(),
       },
     }),
     ScheduleModule.forRoot(),

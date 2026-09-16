@@ -2,6 +2,7 @@ import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { URLSearchParams } from 'url';
+import { randomUUID } from 'crypto';
 import { TraceStorage } from '../common/trace-storage';
 
 interface CreateWalletRequest {
@@ -376,7 +377,7 @@ export class FinanceService {
       const wallet = await this.getWallet(userId);
       if (!wallet) throw new Error('Wallet not found');
 
-      const referenceId = `TOPUP_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const referenceId = `TOPUP_${Date.now()}_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
 
       // Step 1: Create Payment Intent in finance-service
       const createIntentUrl = `${this.financeServiceUrl}/api/finance/payments`;

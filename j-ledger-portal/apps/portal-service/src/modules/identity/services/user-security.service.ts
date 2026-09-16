@@ -17,7 +17,7 @@ import {
 import { PaginationUtility } from '../../../common/utils/pagination.util';
 import { SecurityEventType, AddressType } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
-import { randomUUID, randomBytes } from 'crypto';
+import { randomUUID, randomBytes, randomInt } from 'crypto';
 import Redis from 'ioredis';
 import { REDIS_CLIENT, REDIS_KEYS } from '../../../core/common/constants';
 import { ConfigService } from '@nestjs/config';
@@ -277,8 +277,8 @@ export class UserSecurityService {
       throw new BadRequestException('กรุณายืนยันอีเมลในระบบก่อนทำรายการรีเซ็ต PIN');
     }
 
-    // Generate 6-digit OTP code
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate 6-digit OTP code using cryptographically secure randomInt
+    const otp = randomInt(100000, 1000000).toString();
 
     // Store in Redis with 5 minutes TTL
     const redisKey = REDIS_KEYS.USER.PIN_RESET_OTP(userId);

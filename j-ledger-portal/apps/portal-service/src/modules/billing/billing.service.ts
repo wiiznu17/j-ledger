@@ -9,6 +9,7 @@ import { FinanceService } from '../../core/finance/finance.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { InvoiceStatus } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class BillingService {
@@ -51,10 +52,7 @@ export class BillingService {
 
       // Generate Invoice Number: INV-YYYYMMDD-XXXXXX-RAND
       const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const randomPart = Math.random()
-        .toString(36)
-        .substring(2, 6)
-        .toUpperCase();
+      const randomPart = randomBytes(2).toString('hex').toUpperCase();
       const count = await this.prisma.invoice.count();
       const invoiceNumber = `INV-${datePart}-${(count + 1).toString().padStart(4, '0')}-${randomPart}`;
       this.logger.log(

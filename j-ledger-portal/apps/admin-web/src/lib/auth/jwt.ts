@@ -11,9 +11,9 @@ export interface JWTPayload {
 function getSecret() {
   const secret = process.env.ADMIN_JWT_SECRET;
   if (!secret) {
-    console.warn('[JWT] ADMIN_JWT_SECRET is not defined in environment! Falling back to dev secret.');
+    throw new Error('ADMIN_JWT_SECRET is required in environment');
   }
-  return new TextEncoder().encode(secret || 'jledger-admin-super-secret-2024-dev-key-32chars');
+  return new TextEncoder().encode(secret);
 }
 
 export async function verifyToken(token: string): Promise<JWTPayload | null> {

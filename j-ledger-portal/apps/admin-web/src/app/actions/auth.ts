@@ -51,6 +51,7 @@ export async function login(formData: FormData) {
     cookieStore.set(AUTH_COOKIE_NAME, data.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       maxAge: 60 * 60 * 8, // 8 hours
       path: '/',
     });
@@ -60,6 +61,7 @@ export async function login(formData: FormData) {
     cookieStore.set('refresh_token', data.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days
       path: '/',
     });
@@ -69,6 +71,7 @@ export async function login(formData: FormData) {
     cookieStore.set('user_id', data.userId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7,
       path: '/',
     });
@@ -77,6 +80,7 @@ export async function login(formData: FormData) {
     cookieStore.set('user_role', data.role, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7,
       path: '/',
     });
@@ -85,6 +89,7 @@ export async function login(formData: FormData) {
     cookieStore.set(PERMISSIONS_COOKIE_NAME, JSON.stringify(data.permissions), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7,
       path: '/',
     });
@@ -163,6 +168,7 @@ export async function refreshSession() {
     cookieStore.set('admin_session', data.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       maxAge: 60 * 60 * 8, // 8 hours
       path: '/',
     });
@@ -170,6 +176,7 @@ export async function refreshSession() {
     cookieStore.set('refresh_token', data.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7,
       path: '/',
     });
@@ -177,6 +184,7 @@ export async function refreshSession() {
     cookieStore.set(PERMISSIONS_COOKIE_NAME, JSON.stringify(data.permissions), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7,
       path: '/',
     });

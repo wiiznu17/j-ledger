@@ -190,8 +190,11 @@ export class KycProcessService {
     };
     this.logger.debug(`[KYC] Simple mode extraction completed for user ${userId}`);
     const idCardNumber = extraction.idCardNumber;
-    // In mock/simple mode, we use userId in the token to allow multiple users to test with the same mock ID
-    const idCardToken = this.cryptoService.hashString(idCardNumber + userId);
+    // In production, enforce global deduplication. In non-production mock/simple mode, append userId to allow test users
+    const isProduction = process.env.NODE_ENV === 'production';
+    const idCardToken = this.cryptoService.hashString(
+      isProduction ? idCardNumber : idCardNumber + userId,
+    );
     const encryptedId = this.cryptoService.encryptPii(idCardNumber);
     const encryptedThaiName = this.cryptoService.encryptPii(extraction.thaiName);
 
@@ -310,11 +313,24 @@ export class KycProcessService {
     const thaiName =
       `${dto.prefixTh || ''}${dto.firstNameTh || ''} ${dto.lastNameTh || ''}`.trim();
     const encryptedThaiName = thaiName ? this.cryptoService.encryptPii(thaiName) : null;
-    // In mock/simple mode, we use userId in the token to allow multiple users to test with the same mock ID
-    // TODO: For production, remove + userId to enforce global deduplication of ID cards
+    // In production, enforce global deduplication. In non-production, append userId to allow multiple test accounts
+    const isProduction = process.env.NODE_ENV === 'production';
     const idCardToken = cleanIdNumber
-      ? this.cryptoService.hashString(cleanIdNumber + userId)
+      ? this.cryptoService.hashString(
+          isProduction ? cleanIdNumber : cleanIdNumber + userId,
+        )
       : null;
+
+    if (idCardToken && cleanIdNumber) {
+      const existingKyc = await this.prisma.kYCData.findUnique({
+        where: { idCardToken },
+      });
+      if (existingKyc && existingKyc.userId !== userId) {
+        throw new ConflictException(
+          'This ID card is already registered with another account',
+        );
+      }
+    }
 
     try {
       const updated = await this.prisma.kYCData.update({

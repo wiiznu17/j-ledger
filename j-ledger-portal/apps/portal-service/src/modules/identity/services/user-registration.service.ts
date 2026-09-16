@@ -29,7 +29,7 @@ import {
   AcceptTermsDto,
 } from '../dto/auth.dto';
 import * as bcrypt from 'bcryptjs';
-import { createDecipheriv, randomUUID } from 'crypto';
+import { createDecipheriv, randomUUID, randomInt } from 'crypto';
 import { LogMaskingUtil } from '../../../common/utils/log-masking.util';
 import { IdentityUtils } from '../utils/identity.utils';
 import { UserAuthService } from './user-auth.service';
@@ -695,7 +695,7 @@ export class UserRegistrationService {
   // ==================== Private Helpers ====================
 
   private async createOtpChallenge(userId: string, phoneNumber: string) {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000);
 
     const challenge = await this.prisma.otpChallenge.create({
