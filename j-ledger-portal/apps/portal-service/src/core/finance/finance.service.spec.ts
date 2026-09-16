@@ -191,7 +191,7 @@ describe('FinanceService', () => {
 
       expect(httpService.axiosRef.post).toHaveBeenNthCalledWith(
         2,
-        'http://localhost:8081/api/finance/webhooks',
+        'http://localhost:8081/api/finance/webhooks/payment',
         expect.objectContaining({
           status: 'SUCCESS',
           signature: expect.any(String),

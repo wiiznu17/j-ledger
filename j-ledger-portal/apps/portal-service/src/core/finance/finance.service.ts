@@ -393,7 +393,7 @@ export class FinanceService {
       );
 
       // Step 2: Simulate Payment Confirmation (Settlement)
-      const webhookUrl = `${this.financeServiceUrl}/api/finance/webhooks`;
+      const webhookUrl = `${this.financeServiceUrl}/api/finance/webhooks/payment`;
       const amountStr = amount.toString();
       const signature = this.generateWebhookSignature(
         referenceId,
