@@ -37,34 +37,8 @@ import type { DashboardStats } from '@/lib/requesters/dashboardRequester';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 
-if (typeof window !== 'undefined') {
-  // Silence Recharts responsive container warning
-  const originalError = console.error;
-  console.error = (...args: any[]) => {
-    if (
-      args[0] &&
-      typeof args[0] === 'string' &&
-      args[0].includes('The width') &&
-      args[0].includes('should be greater than 0')
-    ) {
-      return;
-    }
-    originalError(...args);
-  };
 
-  const originalWarn = console.warn;
-  console.warn = (...args: any[]) => {
-    if (
-      args[0] &&
-      typeof args[0] === 'string' &&
-      args[0].includes('The width') &&
-      args[0].includes('should be greater than 0')
-    ) {
-      return;
-    }
-    originalWarn(...args);
-  };
-}
+
 
 export default function DashboardPage() {
   // Independent Date Range States

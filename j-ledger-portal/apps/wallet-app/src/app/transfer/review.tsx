@@ -197,6 +197,7 @@ export default function ReviewTransferScreen() {
           note: formattedNote,
           frequency: frequency,
           startDate: scheduledDate,
+          nextExecutionAt: scheduledDate,
         });
         setIsProcessing(false);
         Alert.alert(

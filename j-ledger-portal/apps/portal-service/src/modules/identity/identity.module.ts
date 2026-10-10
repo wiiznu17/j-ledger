@@ -6,7 +6,10 @@ import { UserRegistrationService } from './services/user-registration.service';
 import { UserProfileService } from './services/user-profile.service';
 import { UserSecurityService } from './services/user-security.service';
 import { UserAdminService } from './services/user-admin.service';
-import { AwsSnsSmSProviderProvider } from '../integrations/providers/sms-provider.aws-sns';
+import { ConfigService } from '@nestjs/config';
+import { AwsSnsSmSProvider } from '../integrations/providers/sms-provider.aws-sns';
+import { SmsProviderMock } from '../integrations/providers/sms-provider.mock';
+import { ISmsProvider as ISmsProviderSymbol } from '../integrations/interfaces/sms-provider.interface';
 import { JwtStrategy } from './jwt.strategy';
 import { IntegrationModule } from '../integration/integration.module';
 import { NotificationModule } from '../notification/notification.module';
@@ -35,7 +38,18 @@ import { NotificationModule } from '../notification/notification.module';
     UserProfileService,
     UserSecurityService,
     UserAdminService,
-    AwsSnsSmSProviderProvider,
+    {
+      provide: ISmsProviderSymbol,
+      useFactory: (configService: ConfigService) => {
+        const providerType = configService.get<string>('SMS_PROVIDER_TYPE', 'mock');
+        const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+        if (providerType === 'aws' && nodeEnv === 'production') {
+          return new AwsSnsSmSProvider(configService);
+        }
+        return new SmsProviderMock();
+      },
+      inject: [ConfigService],
+    },
     JwtStrategy,
   ],
   exports: [

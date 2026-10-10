@@ -31,7 +31,7 @@ export class ScheduledTransferService {
         recipientPhone: data.recipientPhone,
         amount: data.amount,
         frequency: data.frequency as ScheduledTransferFrequency,
-        nextExecutionAt: new Date(data.nextExecutionAt),
+        nextExecutionAt: new Date(data.nextExecutionAt || data.startDate || Date.now()),
         status: ScheduledTransferStatus.ACTIVE,
         note: data.note,
       },

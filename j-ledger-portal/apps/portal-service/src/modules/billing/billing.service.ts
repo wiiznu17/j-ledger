@@ -116,12 +116,31 @@ export class BillingService {
     }
   }
 
+  private formatInvoice(invoice: any) {
+    if (!invoice) return invoice;
+    return {
+      ...invoice,
+      amount: Number(invoice.amount),
+      tax: Number(invoice.tax || 0),
+      total: Number(invoice.total),
+      feeRate: invoice.feeRate ? Number(invoice.feeRate) : null,
+      feeAmount: invoice.feeAmount ? Number(invoice.feeAmount) : null,
+      feeTax: invoice.feeTax ? Number(invoice.feeTax) : null,
+      items: invoice.items?.map((item: any) => ({
+        ...item,
+        unitPrice: Number(item.unitPrice),
+        amount: Number(item.amount),
+      })),
+    };
+  }
+
   async getInvoices(userId: string) {
-    return this.prisma.invoice.findMany({
+    const invoices = await this.prisma.invoice.findMany({
       where: { userId },
       include: { items: true },
       orderBy: { createdAt: 'desc' },
     });
+    return invoices.map((inv) => this.formatInvoice(inv));
   }
 
   async getInvoiceById(id: string, userId: string) {
@@ -341,7 +360,7 @@ export class BillingService {
       throw new NotFoundException('Invoice not found');
     }
 
-    return invoice;
+    return this.formatInvoice(invoice);
   }
 
   async payInvoice(id: string, userId: string) {

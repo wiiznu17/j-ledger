@@ -620,21 +620,12 @@ async function main() {
         (acc: any) => acc.account_name === 'SYSTEM_BANK_ACCOUNT',
       );
 
-      if (!hasBankAcc) {
-        await axios.post(
-          `${financeUrl}/api/v1/accounts`,
-          {
-            user_id: '00000000-0000-0000-0000-000000000000',
-            account_name: 'SYSTEM_BANK_ACCOUNT',
-            currency: 'THB',
-            account_type: 'BANK_CLEARING',
-          },
-          { headers },
-        );
-        console.log('✅ SYSTEM_BANK_ACCOUNT created.');
-      } else {
-        console.log('ℹ️ SYSTEM_BANK_ACCOUNT already exists.');
-      }
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO finance.accounts (id, user_id, account_name, account_type, balance, daily_limit, currency, status, kyc_status, version, created_at, updated_at)
+        VALUES ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', 'SYSTEM_BANK_ACCOUNT', 'BANK_CLEARING', 0, 1000000000, 'THB', 'ACTIVE', 'APPROVED', 0, NOW(), NOW())
+        ON CONFLICT (id) DO NOTHING
+      `).catch(() => {});
+      console.log('✅ SYSTEM_BANK_ACCOUNT ensured.');
     } catch (e: any) {
       console.warn('⚠️ Could not verify or create SYSTEM_BANK_ACCOUNT');
     }

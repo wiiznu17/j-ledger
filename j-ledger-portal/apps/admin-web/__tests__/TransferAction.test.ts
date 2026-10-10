@@ -1,7 +1,12 @@
 import { executeTransfer } from '../src/app/actions/transfer';
+import { transactionRequester } from '@/lib/requesters';
+import { ApiError } from '@/lib/api-client';
 
-// Mock the global fetch natively before assertions
-global.fetch = jest.fn();
+jest.mock('@/lib/requesters', () => ({
+  transactionRequester: {
+    transfer: jest.fn(),
+  },
+}));
 
 describe('Transfer Server Action', () => {
   beforeEach(() => {
@@ -25,10 +30,10 @@ describe('Transfer Server Action', () => {
     expect(result.error).toBe('Missing required fields');
   });
 
-  it('should successfully map to fetch API and explicitly include Idempotency-Key header', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ id: 'tx-999', status: 'COMPLETED' }),
+  it('should successfully call transactionRequester.transfer and explicitly include Idempotency-Key header', async () => {
+    (transactionRequester.transfer as jest.Mock).mockResolvedValueOnce({
+      id: 'tx-999',
+      status: 'COMPLETED',
     });
 
     const formData = new FormData();
@@ -38,19 +43,15 @@ describe('Transfer Server Action', () => {
 
     const result = await executeTransfer(formData);
 
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(transactionRequester.transfer).toHaveBeenCalledTimes(1);
 
-    const fetchCallArgs = (global.fetch as jest.Mock).mock.calls[0];
-    const fetchUrl = fetchCallArgs[0];
-    const fetchOptions = fetchCallArgs[1];
+    const callArgs = (transactionRequester.transfer as jest.Mock).mock.calls[0];
+    const payload = callArgs[0];
+    const options = callArgs[1];
 
-    expect(fetchUrl).toContain('/api/v1/transactions/transfer');
-    expect(fetchOptions.method).toBe('POST');
+    expect(options.headers).toHaveProperty('Idempotency-Key');
 
-    // Explicit Validation of header enforcement logic per requirements
-    expect(fetchOptions.headers).toHaveProperty('Idempotency-Key');
-
-    expect(JSON.parse(fetchOptions.body)).toMatchObject({
+    expect(payload).toMatchObject({
       fromAccountId: 'acc-val-1',
       toAccountId: 'acc-val-2',
       amount: '50.0',
@@ -65,10 +66,9 @@ describe('Transfer Server Action', () => {
   });
 
   it('should defensively catch API failure strings properly', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ message: 'System busy, please try again.' }),
-    });
+    (transactionRequester.transfer as jest.Mock).mockRejectedValueOnce(
+      new ApiError(500, 'System busy, please try again.'),
+    );
 
     const formData = new FormData();
     formData.append('sourceAccountId', 'ac-1');

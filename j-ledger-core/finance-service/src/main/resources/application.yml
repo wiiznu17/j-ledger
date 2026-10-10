@@ -10,13 +10,15 @@ spring:
 
   datasource:
     primary:
-      jdbc-url: ${JLEDGER_DATASOURCE_URL}
+      url: ${JLEDGER_DATASOURCE_URL}
       username: ${JLEDGER_DATASOURCE_USERNAME}
       password: ${JLEDGER_DATASOURCE_PASSWORD}
+      driver-class-name: org.postgresql.Driver
     replica:
-      jdbc-url: ${JLEDGER_DATASOURCE_READ_URL:${JLEDGER_DATASOURCE_URL}}
+      url: ${JLEDGER_DATASOURCE_READ_URL:${JLEDGER_DATASOURCE_URL}}
       username: ${JLEDGER_DATASOURCE_USERNAME}
       password: ${JLEDGER_DATASOURCE_PASSWORD}
+      driver-class-name: org.postgresql.Driver
 
   redis:
     host: ${SPRING_REDIS_HOST:localhost}

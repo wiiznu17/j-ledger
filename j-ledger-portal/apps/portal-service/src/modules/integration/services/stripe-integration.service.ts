@@ -322,6 +322,7 @@ export class StripeIntegrationService {
       await this.financeService.processPaymentWebhook(
         paymentIntentId,
         'SUCCESS',
+        Number(order.amount),
       );
     } catch (error: any) {
       this.logger.error(
@@ -404,6 +405,7 @@ export class StripeIntegrationService {
       await this.financeService.processPaymentWebhook(
         paymentIntentId,
         'FAILED',
+        Number(order.amount),
       );
     } catch (err) {
       this.logger.error(

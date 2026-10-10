@@ -38,11 +38,32 @@ interface InvoiceViewProps {
 }
 
 export const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice }) => {
-  const formatCurrency = (val: number) => {
+  const parseAmount = (val: any): number => {
+    if (val === null || val === undefined) return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    if (typeof val === 'string') {
+      const parsed = parseFloat(val);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    if (typeof val === 'object') {
+      if (Array.isArray(val.d) && val.d.length > 0) {
+        const sign = val.s || 1;
+        const exp = val.e ?? 0;
+        const numStr = val.d.join('');
+        const num = parseFloat(numStr) * Math.pow(10, exp - (numStr.length - 1));
+        return isNaN(num) ? 0 : sign * num;
+      }
+    }
+    const num = Number(val);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const formatCurrency = (val: any) => {
+    const num = parseAmount(val);
     return new Intl.NumberFormat('th-TH', {
       style: 'currency',
       currency: invoice.currency || 'THB',
-    }).format(val);
+    }).format(num);
   };
 
   // Helper to extract location from note if present, e.g. "Dinner [Loc: Nonthaburi, Thailand]"
@@ -271,8 +292,8 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice }) => {
           <Text className="text-2xl font-manrope font-black text-[#f48fb1]">
             {formatCurrency(
               details.type === 'PAYMENT'
-                ? Number(invoice.total)
-                : Number(invoice.amount),
+                ? (invoice.total ?? invoice.amount)
+                : (invoice.amount ?? invoice.total ?? invoice.items?.[0]?.amount),
             )}
           </Text>
         </View>

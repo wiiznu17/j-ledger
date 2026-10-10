@@ -80,7 +80,7 @@
 - [ ] **Action**: ทั้งหมดควรใช้ structured logger (Pino) แทน console.log, หรือลบออกถ้าเป็น debug
 
 ### CQ-04: Error Console Suppression (Anti-pattern)
-- [ ] `apps/admin-web/src/app/(dashboard)/dashboard/page.tsx:42-56` — Override `console.error` และ `console.warn` เพื่อซ่อน error → ซ่อน bug จริง ควรแก้ที่ต้นเหตุ
+- [x] `apps/admin-web/src/app/(dashboard)/dashboard/page.tsx:42-56` — ลบ Override `console.error` และ `console.warn` ที่ใช้ซ่อน Recharts warning ออกแล้ว (warning นี้ไม่เป็นอันตราย และมี `mounted` state guard อยู่แล้ว)
 
 ### CQ-05: Swallowed Errors (Empty Catch Blocks)
 - [ ] `apps/portal-service/src/modules/integration/services/transaction-history.service.ts:224,286,297` — `catch {}` ว่างเปล่า (3 จุด)
@@ -125,6 +125,25 @@
 ### CQ-12: Wallet App My QR Silent Fallback to Mock User (ค้นพบเพิ่ม 2026-09-15)
 - [x] `apps/wallet-app/src/app/my-qr.tsx` — ลบ silent fallback ไปหา MOCK_USER โดยใช้ข้อมูลจริงจาก user profile / email / account และ default logo เรียบร้อย
   - **Fix**: แสดง Loading spinner หรือ error screen เมื่อไม่พบข้อมูลผู้ใช้ แทนการแสดง QR ของ Mock User
+
+### CQ-13: Wallet App Session Management & Welcome Back (PIN Unlock / Switch Account)
+- [ ] **ปัญหาที่พบ (Root Causes):**
+  1. `ACCESS_TOKEN_TTL_SECONDS = 3 * 60` (3 นาที) ใน `user-auth.service.ts` สั้นเกินไป ทำให้ token หมดอายุแทบตลอดเวลา
+  2. `LOCK_TIMEOUT_MS = 60000` (1 นาที) ใน `useAppLock.ts` พับจอหรือสลับแอปครู่เดียวก็ล็อกหน้าจอ
+  3. เมื่อ silent refresh ใน `axios.ts` ล้มเหลว มีการสั่ง `logout()` ล้าง `auth_token`, `refresh_token`, และ `wallet_user` ออกจาก SecureStore หมดเกลี้ยง
+  4. Backend `/identity/pin/verify` ติด `@UseGuards(JwtAuthGuard)` ทำให้เมื่อ access token หมดอายุ การกด PIN เพื่อปลดล็อกติด 401
+  5. ขาดระบบ Remembered User ทำให้เมื่อ session หลุดหรือเปิดแอปใหม่ แอปดีดกลับไปหน้า Phone + Password + OTP ทุกครั้ง แทนที่จะจำผู้ใช้เดิมไว้
+- [ ] **แนวทางแก้ไข (Implementation Tasks):**
+  - [ ] **Backend (`portal-service`):**
+    - ขยาย `ACCESS_TOKEN_TTL_SECONDS` เป็น 15 นาที - 1 ชั่วโมง เพื่อลดปัญหา token หมดอายุบ่อยและลด race condition
+    - ตรวจสอบ/ปรับปรุง endpoint verify PIN หรือ refresh ให้ปลดล็อกได้อย่างราบรื่นแม้ access token หมดอายุ
+  - [ ] **Frontend (`wallet-app`):**
+    - บันทึก `remembered_account` (ชื่อ, avatar, masked phone `08x-xxx-xxxx`) ลง SecureStore แยกต่างหาก ไม่ถูกลบเมื่อ token หมดอายุ
+    - ปรับปรุง `axios.ts` interceptor: หาก silent refresh ล้มเหลว ให้ lock session (`needsPinVerification: true`) แทนการ wipe ข้อมูลผู้ใช้ทิ้งทันที
+    - ปรับปรุงหน้า `(auth)/login.tsx` ให้มีโหมด **"ยินดีต้อนรับกลับ (Welcome Back)"**:
+      - แสดง Avatar + ข้อความ "สวัสดี คุณ [ชื่อ]" + เบอร์โทรที่ mask ไว้
+      - แสดงแป้นกด PIN 6 หลักทันที พร้อมปุ่มลัด Biometric (สแกนนิ้ว/ใบหน้า)
+      - มีปุ่ม **"สลับบัญชี" (Switch Account / เข้าสู่ระบบด้วยบัญชีอื่น)** ด้านล่าง เพื่อความสะดวกในการเปลี่ยนผู้ใช้
 
 ---
 

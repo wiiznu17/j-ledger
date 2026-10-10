@@ -108,3 +108,5 @@ secrets/
 aws-credentials
 .aws/
 google-credentials.json
+
+j-ledger-portal/apps/portal-service/uploads

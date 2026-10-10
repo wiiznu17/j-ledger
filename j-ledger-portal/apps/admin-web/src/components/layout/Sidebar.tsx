@@ -354,6 +354,7 @@ export function Sidebar({
         {navigationGroups.map((group) => {
           // Filter items based on role and permissions
           const filteredItems = group.items.filter((item) => {
+            if (userRole === 'SUPER_ADMIN') return true;
             const rolePass = !item.roles || item.roles.includes(userRole);
             const permissionPass =
               !item.requiredPermission ||

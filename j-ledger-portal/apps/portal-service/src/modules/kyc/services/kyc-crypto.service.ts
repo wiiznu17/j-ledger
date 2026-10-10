@@ -20,8 +20,8 @@ export class KycCryptoService {
         'System missing PII encryption capabilities',
       );
     }
-    const iv = randomBytes(12);
-    const key = Buffer.from(encryptionKey, 'hex');
+    const iv = randomBytes(12); // เป็นค่าที่สร้างขึ้นมาแบบสุ่มเพื่อความปลอดภัยของข้อมูล เช่น 23f0e1c8a3d9
+    const key = Buffer.from(encryptionKey, 'hex'); // เป็นค่าที่กำหนดไว้ใน .env เช่น 12345678901234567890123456789012
     const cipher = createCipheriv('aes-256-gcm', key, iv);
 
     let encrypted = cipher.update(data, 'utf8', 'hex');
