@@ -89,18 +89,11 @@ npm install
 npm run start:dev
 ```
 
-## Deployment
-
-The system supports deploying to AWS EC2 using a full Docker stack. For detailed deployment instructions, server configuration, and SSL setup, please refer to the [Deployment Guide](deployment-guide.md).
-
 ## Documentation
 
-For deeper insights into the project structure, please review the following documentation files located in the root directory:
-- `ABOUT_PROJECT.md`: Detailed project scope, deployment modes, and database management commands.
-- `DATABASE_DIAGRAM.md`: Database schema definitions and relationships.
-- `network.md`: Network architecture and routing configurations.
-- `SECURITY_AUDIT_REPORT.md` & `SECURITY_FINDINGS_AND_REMEDIATION.md`: Security compliance and auditing guidelines.
-
-## Security Notice
-
-Never commit `.env` files or sensitive credential files (such as `.pem`, `.key`, or `.csv` access keys) to the repository. The `.gitignore` is pre-configured to prevent accidental commits of known sensitive file formats.
+Detailed architectural and technical guides can be found in the [`docs/`](docs/) directory:
+- [`ABOUT_PROJECT.md`](docs/ABOUT_PROJECT.md): Project overview, scope, and services guide.
+- [`DATABASE_DIAGRAM.md`](docs/DATABASE_DIAGRAM.md): Database schemas, relationships, and ERD.
+- [`JAVA_CORE.md`](docs/JAVA_CORE.md): Java 21, Spring Boot, and Kafka core guide.
+- [`KEY_SYSTEM_FLOWS.md`](docs/KEY_SYSTEM_FLOWS.md): Distributed locks, idempotency, and outbox flows.
+- [`deployment-guide.md`](docs/deployment-guide.md): Deployment, Docker stack, and server configuration.

@@ -6,6 +6,7 @@ import com.jledger.finance.domain.entity.IntegrationOutbox;
 import com.jledger.finance.domain.entity.LedgerEntry;
 import com.jledger.finance.domain.entity.Transaction;
 import com.jledger.finance.domain.enums.NotificationEventType;
+import com.jledger.finance.dto.LedgerLeg;
 import com.jledger.finance.repository.ledger.AccountRepository;
 import com.jledger.finance.repository.ledger.LedgerEntryRepository;
 import com.jledger.finance.repository.system.IntegrationOutboxRepository;
@@ -88,6 +89,58 @@ public class WalletCommonService {
                     .description(description != null ? description : "Ledger Transfer (Credit)")
                     .build();
             ledgerEntryRepository.save(Objects.requireNonNull(creditEntry));
+        }
+    }
+
+    /**
+     * Records a multi-leg journal entry ensuring sum(Debit) == sum(Credit).
+     *
+     * @param transactionId the business transaction ID
+     * @param legs the list of debit and credit legs
+     */
+    @Transactional
+    public void recordMultiLegEntry(String transactionId, List<LedgerLeg> legs) {
+        if (legs == null || legs.isEmpty()) {
+            throw new IllegalArgumentException("Legs cannot be null or empty");
+        }
+
+        BigDecimal totalDebit = BigDecimal.ZERO;
+        BigDecimal totalCredit = BigDecimal.ZERO;
+
+        for (LedgerLeg leg : legs) {
+            if (leg == null || leg.amount() == null) {
+                continue;
+            }
+            if (leg.amount().compareTo(BigDecimal.ZERO) == 0) {
+                continue;
+            }
+
+            LedgerEntry entry = LedgerEntry.builder()
+                    .account(leg.account())
+                    .entryType(leg.entryType())
+                    .amount(leg.amount())
+                    .transactionId(transactionId)
+                    .description(leg.description())
+                    .build();
+            ledgerEntryRepository.save(Objects.requireNonNull(entry));
+
+            if ("DEBIT".equalsIgnoreCase(leg.entryType())) {
+                totalDebit = totalDebit.add(leg.amount());
+            } else if ("CREDIT".equalsIgnoreCase(leg.entryType())) {
+                totalCredit = totalCredit.add(leg.amount());
+            } else {
+                throw new IllegalArgumentException("Unsupported entry type: " + leg.entryType());
+            }
+        }
+
+        if (totalDebit.compareTo(BigDecimal.ZERO) <= 0 && totalCredit.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Multi-leg entry must have non-zero amounts");
+        }
+
+        if (totalDebit.compareTo(totalCredit) != 0) {
+            throw new IllegalStateException(
+                    String.format("Ledger imbalance detected for txn %s: Total Debit=%s, Total Credit=%s (discrepancy=%s)",
+                            transactionId, totalDebit, totalCredit, totalDebit.subtract(totalCredit)));
         }
     }
 

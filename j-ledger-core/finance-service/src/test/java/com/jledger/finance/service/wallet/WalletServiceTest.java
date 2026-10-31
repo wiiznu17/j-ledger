@@ -19,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -138,7 +139,8 @@ class WalletServiceTest {
                 systemService,
                 objectMapper,
                 walletCacheService,
-                walletCommonService
+                walletCommonService,
+                jLedgerProperties
         );
 
         walletService = new WalletServiceImpl(
@@ -603,6 +605,169 @@ class WalletServiceTest {
             assertThat(preview.get("fee")).isEqualTo(BigDecimal.ZERO.setScale(4));
             assertThat(preview.get("totalDebit")).isEqualTo(new BigDecimal("100.0000"));
             assertThat(preview.get("currency")).isEqualTo("THB");
+        }
+    }
+
+    @Nested
+    @DisplayName("Bill Payment & Banker's Rounding Multi-leg Ledger Tests")
+    class BillPaymentMultiLegTests {
+
+        private Account userAccount;
+        private Account systemAccount;
+        private Account feeAccount;
+        private Account roundingAccount;
+
+        @BeforeEach
+        void initAccounts() {
+            userAccount = Account.builder()
+                    .id(UUID.randomUUID())
+                    .userId(UUID.fromString(USER_ID))
+                    .accountName("User Ledger Account")
+                    .accountType(AccountType.WALLET)
+                    .balance(new BigDecimal("1000.0000"))
+                    .currency("THB")
+                    .build();
+
+            systemAccount = Account.builder()
+                    .id(UUID.fromString("00000000-0000-0000-0000-000000000000"))
+                    .userId(UUID.fromString("00000000-0000-0000-0000-000000000000"))
+                    .accountName("SYSTEM_BANK_ACCOUNT")
+                    .accountType(AccountType.BANK_CLEARING)
+                    .balance(BigDecimal.ZERO)
+                    .currency("THB")
+                    .build();
+
+            feeAccount = Account.builder()
+                    .id(UUID.fromString("00000000-0000-0000-0000-000000000001"))
+                    .userId(UUID.fromString("00000000-0000-0000-0000-000000000000"))
+                    .accountName("SYSTEM_FEE_ACCOUNT")
+                    .accountType(AccountType.FEE)
+                    .balance(BigDecimal.ZERO)
+                    .currency("THB")
+                    .build();
+
+            roundingAccount = Account.builder()
+                    .id(UUID.fromString("00000000-0000-0000-0000-000000000002"))
+                    .userId(UUID.fromString("00000000-0000-0000-0000-000000000000"))
+                    .accountName("SYSTEM_ROUNDING_ACCOUNT")
+                    .accountType(AccountType.ROUNDING_DIFFERENCE)
+                    .balance(BigDecimal.ZERO)
+                    .currency("THB")
+                    .build();
+        }
+
+        @Test
+        @DisplayName("payUtilityBill should apply Banker's Rounding and record multi-leg ledger entries")
+        void shouldPayUtilityBillWithBankersRoundingAndMultiLeg() throws Exception {
+            // Arrange
+            Wallet wallet = new Wallet();
+            wallet.setId(WALLET_ID);
+            wallet.setUserId(USER_ID);
+            wallet.setBalance(new BigDecimal("1000.0000"));
+            wallet.setStatus(WalletStatus.ACTIVE);
+            wallet.setCurrency("THB");
+
+            SystemSettings settings = new SystemSettings();
+            settings.setBillPaymentFeeFixed(new BigDecimal("5.0000"));
+            settings.setBillPaymentFeePercentage(new BigDecimal("0.5000")); // 0.5%
+
+            when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(wallet));
+            when(systemService.getSystemSettings()).thenReturn(settings);
+            when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+            when(accountRepository.findByUserId(UUID.fromString(USER_ID)))
+                    .thenReturn(Collections.singletonList(userAccount));
+            when(accountRepository.findById(UUID.fromString("00000000-0000-0000-0000-000000000000")))
+                    .thenReturn(Optional.of(systemAccount));
+            when(accountRepository.findById(UUID.fromString("00000000-0000-0000-0000-000000000001")))
+                    .thenReturn(Optional.of(feeAccount));
+            lenient().when(accountRepository.findById(UUID.fromString("00000000-0000-0000-0000-000000000002")))
+                    .thenReturn(Optional.of(roundingAccount));
+
+            // Act: Pay 100 THB bill -> 0.5% is 0.5000 THB, fixed 5.0000 THB -> total fee = 5.5000 THB
+            Transaction txn = walletService.payUtilityBill(USER_ID, "MEA", "ACC-12345", new BigDecimal("100.0000"));
+
+            // Assert
+            assertThat(txn).isNotNull();
+            assertThat(txn.getType()).isEqualTo(TransactionType.BILL_PAYMENT);
+            assertThat(txn.getAmount()).isEqualByComparingTo("100.0000");
+            assertThat(wallet.getBalance()).isEqualByComparingTo("894.5000"); // 1000 - 105.5000
+
+            // Multi-leg ledger verify: 3 legs (Debit User: 105.50, Credit System: 100.00, Credit Fee: 5.50)
+            ArgumentCaptor<LedgerEntry> captor = ArgumentCaptor.forClass(LedgerEntry.class);
+            verify(ledgerEntryRepository, atLeast(3)).save(captor.capture());
+
+            List<LedgerEntry> entries = captor.getAllValues();
+            BigDecimal debitSum = entries.stream()
+                    .filter(e -> "DEBIT".equals(e.getEntryType()))
+                    .map(LedgerEntry::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal creditSum = entries.stream()
+                    .filter(e -> "CREDIT".equals(e.getEntryType()))
+                    .map(LedgerEntry::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            assertThat(debitSum).isEqualByComparingTo(creditSum);
+            assertThat(debitSum).isEqualByComparingTo("105.5000");
+        }
+
+        @Test
+        @DisplayName("payCreditCardBill should apply Banker's Rounding and record multi-leg ledger entries")
+        void shouldPayCreditCardBillWithBankersRoundingAndMultiLeg() throws Exception {
+            // Arrange
+            Wallet wallet = new Wallet();
+            wallet.setId(WALLET_ID);
+            wallet.setUserId(USER_ID);
+            wallet.setBalance(new BigDecimal("5000.0000"));
+            wallet.setStatus(WalletStatus.ACTIVE);
+            wallet.setCurrency("THB");
+
+            SystemSettings settings = new SystemSettings();
+            settings.setBillPaymentFeeFixed(new BigDecimal("10.0000"));
+            settings.setBillPaymentFeePercentage(new BigDecimal("0.3500")); // 0.35%
+
+            when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(wallet));
+            when(systemService.getSystemSettings()).thenReturn(settings);
+            when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+            when(accountRepository.findByUserId(UUID.fromString(USER_ID)))
+                    .thenReturn(Collections.singletonList(userAccount));
+            when(accountRepository.findById(UUID.fromString("00000000-0000-0000-0000-000000000000")))
+                    .thenReturn(Optional.of(systemAccount));
+            when(accountRepository.findById(UUID.fromString("00000000-0000-0000-0000-000000000001")))
+                    .thenReturn(Optional.of(feeAccount));
+            lenient().when(accountRepository.findById(UUID.fromString("00000000-0000-0000-0000-000000000002")))
+                    .thenReturn(Optional.of(roundingAccount));
+
+            // Act: Pay 1000 THB credit card -> 0.35% is 3.5000 THB, fixed 10.0000 THB -> total fee = 13.5000 THB
+            Transaction txn = walletService.payCreditCardBill(USER_ID, "4111222233334444", new BigDecimal("1000.0000"));
+
+            // Assert
+            assertThat(txn).isNotNull();
+            assertThat(txn.getType()).isEqualTo(TransactionType.BILL_PAYMENT);
+            assertThat(txn.getAmount()).isEqualByComparingTo("1000.0000");
+            assertThat(wallet.getBalance()).isEqualByComparingTo("3986.5000"); // 5000 - 1013.5000
+
+            // Multi-leg ledger verify: ΣDebit == ΣCredit
+            ArgumentCaptor<LedgerEntry> captor = ArgumentCaptor.forClass(LedgerEntry.class);
+            verify(ledgerEntryRepository, atLeast(3)).save(captor.capture());
+
+            List<LedgerEntry> entries = captor.getAllValues();
+            BigDecimal debitSum = entries.stream()
+                    .filter(e -> "DEBIT".equals(e.getEntryType()))
+                    .map(LedgerEntry::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal creditSum = entries.stream()
+                    .filter(e -> "CREDIT".equals(e.getEntryType()))
+                    .map(LedgerEntry::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            assertThat(debitSum).isEqualByComparingTo(creditSum);
+            assertThat(debitSum).isEqualByComparingTo("1013.5000");
         }
     }
 }

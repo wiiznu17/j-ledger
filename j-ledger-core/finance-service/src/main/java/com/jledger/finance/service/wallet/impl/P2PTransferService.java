@@ -3,6 +3,7 @@ package com.jledger.finance.service.wallet.impl;
 import com.jledger.finance.service.wallet.WalletService;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jledger.finance.config.JLedgerProperties;
 import com.jledger.finance.domain.entity.Account;
 import com.jledger.finance.domain.entity.LedgerEntry;
 import com.jledger.finance.domain.entity.SystemSettings;
@@ -10,6 +11,7 @@ import com.jledger.finance.domain.entity.Transaction;
 import com.jledger.finance.domain.entity.Wallet;
 import com.jledger.finance.domain.enums.TransactionStatus;
 import com.jledger.finance.domain.enums.TransactionType;
+import com.jledger.finance.dto.LedgerLeg;
 import com.jledger.finance.exception.ConflictException;
 import com.jledger.finance.exception.ResourceNotFoundException;
 import com.jledger.finance.repository.ledger.AccountRepository;
@@ -17,6 +19,7 @@ import com.jledger.finance.repository.ledger.LedgerEntryRepository;
 import com.jledger.finance.repository.transaction.TransactionRepository;
 import com.jledger.finance.repository.wallet.WalletRepository;
 import com.jledger.finance.service.compliance.SystemService;
+import com.jledger.finance.util.MonetaryRounding;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -43,6 +46,7 @@ public class P2PTransferService {
     private final ObjectMapper objectMapper;
     private final WalletCacheService walletCacheService;
     private final WalletCommonService walletCommonService;
+    private final JLedgerProperties jLedgerProperties;
 
     @Transactional
     public Transaction transferByPhone(String fromUserId, String toPhone, BigDecimal amount) {
@@ -438,7 +442,7 @@ public class P2PTransferService {
         BigDecimal fixedFee = settings.getBillPaymentFeeFixed() != null ? settings.getBillPaymentFeeFixed() : BigDecimal.ZERO;
         BigDecimal percentFee = settings.getBillPaymentFeePercentage() != null ? settings.getBillPaymentFeePercentage() : BigDecimal.ZERO;
         
-        BigDecimal percentageFeeAmount = amount.multiply(percentFee).divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP);
+        BigDecimal percentageFeeAmount = MonetaryRounding.calculatePercentageFee(amount, percentFee);
         BigDecimal totalFee = fixedFee.add(percentageFeeAmount);
         BigDecimal totalDebit = amount.add(totalFee);
 
@@ -491,6 +495,9 @@ public class P2PTransferService {
             transactionRepository.save(feeTx);
         }
 
+        recordBillPaymentLedger(userId, wallet.getCurrency(), savedTransaction.getTransactionId(),
+                amount, totalFee, totalDebit, "Utility bill payment to " + billerCode);
+
         walletCommonService.publishTransactionEvent(userId, savedTransaction, false);
 
         return savedTransaction;
@@ -509,7 +516,7 @@ public class P2PTransferService {
         BigDecimal fixedFee = settings.getBillPaymentFeeFixed() != null ? settings.getBillPaymentFeeFixed() : BigDecimal.ZERO;
         BigDecimal percentFee = settings.getBillPaymentFeePercentage() != null ? settings.getBillPaymentFeePercentage() : BigDecimal.ZERO;
         
-        BigDecimal percentageFeeAmount = amount.multiply(percentFee).divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP);
+        BigDecimal percentageFeeAmount = MonetaryRounding.calculatePercentageFee(amount, percentFee);
         BigDecimal totalFee = fixedFee.add(percentageFeeAmount);
         BigDecimal totalDebit = amount.add(totalFee);
 
@@ -559,9 +566,43 @@ public class P2PTransferService {
             transactionRepository.save(feeTx);
         }
 
+        recordBillPaymentLedger(userId, wallet.getCurrency(), savedTransaction.getTransactionId(),
+                amount, totalFee, totalDebit, "Credit card payment: " + cardNumber);
+
         walletCommonService.publishTransactionEvent(userId, savedTransaction, false);
 
         return savedTransaction;
+    }
+
+    private void recordBillPaymentLedger(String userId, String currency, String transactionId,
+                                         BigDecimal amount, BigDecimal totalFee, BigDecimal totalDebit,
+                                         String description) {
+        Account senderAccount = walletCommonService.getOrCreateLedgerAccount(userId, currency);
+        Account systemAccount = accountRepository.findById(jLedgerProperties.getSystem().getAccountId())
+                .orElseThrow(() -> new ResourceNotFoundException("System account not found"));
+
+        List<LedgerLeg> legs = new ArrayList<>();
+        legs.add(LedgerLeg.debit(senderAccount, totalDebit, description));
+        legs.add(LedgerLeg.credit(systemAccount, amount, description + " (Principal)"));
+
+        if (totalFee != null && totalFee.compareTo(BigDecimal.ZERO) > 0) {
+            Account feeAccount = accountRepository.findById(jLedgerProperties.getSystem().getFeeAccountId())
+                    .orElseThrow(() -> new ResourceNotFoundException("System fee account not found"));
+            legs.add(LedgerLeg.credit(feeAccount, totalFee, "Service fee"));
+        }
+
+        BigDecimal roundingDiff = totalDebit.subtract(amount).subtract(totalFee != null ? totalFee : BigDecimal.ZERO);
+        if (roundingDiff.compareTo(BigDecimal.ZERO) != 0) {
+            Account roundingAccount = accountRepository.findById(jLedgerProperties.getSystem().getRoundingDifferenceAccountId())
+                    .orElseThrow(() -> new ResourceNotFoundException("System rounding difference account not found"));
+            if (roundingDiff.compareTo(BigDecimal.ZERO) > 0) {
+                legs.add(LedgerLeg.credit(roundingAccount, roundingDiff.abs(), "Rounding adjustment"));
+            } else {
+                legs.add(LedgerLeg.debit(roundingAccount, roundingDiff.abs(), "Rounding adjustment"));
+            }
+        }
+
+        walletCommonService.recordMultiLegEntry(transactionId, legs);
     }
 
     @Transactional

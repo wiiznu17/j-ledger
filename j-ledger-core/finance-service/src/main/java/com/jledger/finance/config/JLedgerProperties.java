@@ -29,5 +29,7 @@ public class JLedgerProperties {
     @Setter
     public static class System {
         private UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+        private UUID feeAccountId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        private UUID roundingDifferenceAccountId = UUID.fromString("00000000-0000-0000-0000-000000000002");
     }
 }

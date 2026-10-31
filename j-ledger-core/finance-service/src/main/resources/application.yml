@@ -55,6 +55,8 @@ jledger:
     monthly: 5000000
   system:
     account-id: "00000000-0000-0000-0000-000000000000"
+    fee-account-id: "00000000-0000-0000-0000-000000000001"
+    rounding-difference-account-id: "00000000-0000-0000-0000-000000000002"
 
   redis:
     redisson:

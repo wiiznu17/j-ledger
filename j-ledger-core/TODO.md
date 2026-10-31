@@ -11,10 +11,29 @@
 | Priority | จำนวนงานคงเหลือ | สถานะ |
 |----------|:-----:|:-----:|
 | 🔴 Critical (Priority 1) | 0 | ✅ สำเร็จทั้งหมด |
-| 🟡 High (Priority 2) | 0 | ✅ สำเร็จทั้งหมด |
+| 🟡 High (Priority 2) | 0 | ✅ สำเร็จทั้งหมด (Financial Precision) |
 | 🟢 Medium (Priority 3) | 1 | `[ ]` รอทำ |
-| 🔵 Nice-to-Have (Priority 4) | 6 | `[ ]` รอทำ |
-| **รวมคงเหลือ** | **7** | |
+| 🔵 Nice-to-Have (Priority 4) | 5 | `[ ]` รอทำ |
+| **รวมคงเหลือ** | **6** | |
+
+---
+
+## 🟡 Priority 2 — High (Financial Precision & Multi-leg Ledger Integrity)
+
+### 2.1 เพิ่ม Banker's Rounding (HALF_EVEN) และ Rounding Difference Ledger
+- [x] **ปัญหา:** 
+  1. ปัจจุบันการคำนวณค่าธรรมเนียม (`P2PTransferService.java`) ใช้ `RoundingMode.HALF_UP` ซึ่งในการทำธุรกรรมปริมาณมาก (Scale ใหญ่) จะเกิดความเอนเอียงทางสถิติ (Statistical Bias) ปัดขึ้นมากกว่าปัดลง ทำให้ยอดเงินรวมทั้งระบบค่อยๆ บวมขึ้น
+  2. การคำนวณทศนิยม 4 ตำแหน่งระดับ Sub-cent เมื่อถูกปัดเศษเหลือ 2 ตำแหน่ง หรือกรณีแบ่งจ่าย จะเกิดผลต่างเศษสตางค์ ($\pm 0.01$ บาท) ที่ทำให้ $\sum \text{Debit} \neq \sum \text{Credit}$ ส่งผลให้กระทบยอดบัญชี (Reconciliation) ปลายวันไม่ลงตัว
+  3. บัญชี `AccountType.FEE` ถูกประกาศไว้แล้วแต่ยังไม่ได้ตัด Multi-leg (3 ขา) บันทึกรายได้ค่าธรรมเนียมแยกออกมาจากยอดโอนหลักอย่างสมบูรณ์
+- [x] **แนวทางแก้ไข:**
+  - [x] เปลี่ยนโหมดปัดเศษใน `P2PTransferService` และ `TreasuryServiceImpl` เป็น `RoundingMode.HALF_EVEN` (Banker's Rounding) ผ่าน `MonetaryRounding` utility
+  - [x] เพิ่มประเภทบัญชีกองกลาง `AccountType.ROUNDING_DIFFERENCE` (ระบบ Asset/Liability พิเศษ) มารองรับเศษสตางค์ผลต่างจากการปัดเศษในระดับ Journal Entry (พร้อม migration `V10__add_system_fee_and_rounding_accounts.sql`)
+  - [x] ปรับกลไก Double-entry ให้รองรับ Multi-leg Entry ผ่าน `recordMultiLegEntry()` ใน `WalletCommonService` เมื่อมี Fee หรือ Rounding Adjustment:
+    - **DEBIT:** บัญชีผู้โอน (ยอดรวมทั้งสิ้น)
+    - **CREDIT:** บัญชีผู้รับ/ระบบเคลียริ่ง (ยอดเงินโอนสุทธิ)
+    - **CREDIT:** บัญชีค่าธรรมเนียม (`AccountType.FEE`)
+    - **CREDIT / DEBIT:** บัญชีเศษสตางค์ปัดเศษ (`AccountType.ROUNDING_DIFFERENCE`)
+  - [x] เพิ่ม Unit / Integration Test ตรวจสอบว่าทุก Entry $\sum \text{Debit} == \sum \text{Credit}$ เป็น 0 เสมอ แม้เจอเศษทศนิยมไม่รู้จบ (`MonetaryRoundingTest`, `MultiLegLedgerTest`, `WalletServiceTest$BillPaymentMultiLegTests`)
 
 ---
 

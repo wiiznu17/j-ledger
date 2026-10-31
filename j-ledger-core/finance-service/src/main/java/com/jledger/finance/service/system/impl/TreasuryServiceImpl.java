@@ -60,7 +60,7 @@ public class TreasuryServiceImpl implements TreasuryService {
         BigDecimal reserveRatio = BigDecimal.ZERO;
         if (totalCustomerLiability.compareTo(BigDecimal.ZERO) > 0) {
             reserveRatio = totalAssets.multiply(new BigDecimal("100"))
-                    .divide(totalCustomerLiability, 2, RoundingMode.HALF_UP);
+                    .divide(totalCustomerLiability, 2, RoundingMode.HALF_EVEN);
         }
 
         TreasurySummaryResponse response = new TreasurySummaryResponse();
